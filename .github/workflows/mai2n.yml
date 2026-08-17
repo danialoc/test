@@ -5,6 +5,8 @@ on:
 
 jobs:
   secure-vnc-mac:
+    # ملاحظة: إذا استمرت الشاشة السوداء بسبب حماية macOS 14، قم بتغيير السطر التالي إلى:
+    # runs-on: macos-13
     runs-on: macos-latest
     timeout-minutes: 3600
 
@@ -21,10 +23,10 @@ jobs:
         run: |
           echo -e "\033[36mإعداد خدمة الاتصال عن بُعد (VNC)...\033[0m"
           
-          # إنشاء حساب مسؤول جديد
-          sudo sysadminctl -addUser macadmin -fullName "Mac Admin" -password "Yahia@2yahiA" -admin
+          # بدلاً من إنشاء حساب جديد، نضع كلمة مرور للحساب الافتراضي (runner) لحل مشكلة الشاشة السوداء
+          sudo dscl . -passwd /Users/runner "Yahia@2yahiA"
           
-          # تفعيل Screen Sharing (VNC) ومنح الصلاحيات اللازمة للاتصال
+          # تفعيل Screen Sharing (VNC) للحساب الحالي
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -allowAccessFor -allUsers \
@@ -32,6 +34,9 @@ jobs:
             -clientopts -setvnclegacy -vnclegacy yes \
             -clientopts -setvncpw -vncpw "Yahia@2y" \
             -restart -agent
+            
+          # إرسال أمر لوحة مفاتيح وهمي لإيقاظ الشاشة في حال كانت في وضع السكون
+          osascript -e 'tell application "System Events" to key code 123' || true
 
           echo -e "\033[32mتم إعداد خدمة VNC بنجاح!\033[0m"
 
@@ -57,8 +62,9 @@ jobs:
           echo -e "\033[36m   سيرفر الماك جاهز للاتصال\033[0m"
           echo -e "\033[32m========================================\033[0m"
           echo -e "\033[33mالعنوان (Tailscale IP): $TAILSCALE_IP\033[0m"
-          echo -e "\033[33mكلمة المرور للـ VNC Viewer: Yahia@2y\033[0m"
-          echo -e "\033[33mحساب الأدمن للماك (macadmin): Yahia@2yahiA\033[0m"
+          echo -e "\033[33mكلمة المرور للـ VNC Viewer (إن طُلبت): Yahia@2y\033[0m"
+          echo -e "\033[33mحساب الماك (Username): runner\033[0m"
+          echo -e "\033[33mكلمة مرور الماك (Password): Yahia@2yahiA\033[0m"
           echo -e "\033[32m========================================\033[0m"
 
       - name: Maintain Connection
