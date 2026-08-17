@@ -5,7 +5,7 @@ on:
 
 jobs:
   secure-vnc-mac:
-    runs-on: macos-latest  # أحدث إصدار من macOS (بمعالجات Apple Silicon)
+    runs-on: macos-latest
     timeout-minutes: 3600
 
     steps:
@@ -13,7 +13,6 @@ jobs:
         run: |
           echo -e "\033[36mتفعيل وضع الأداء العالي ومنع السكون...\033[0m"
           
-          # منع النظام والشاشة من الدخول في وضع السكون
           sudo pmset -a sleep 0
           sudo pmset -a displaysleep 0
           sudo pmset -a disablesleep 1
@@ -24,11 +23,10 @@ jobs:
         run: |
           echo -e "\033[36mإعداد خدمة الاتصال عن بُعد (VNC)...\033[0m"
           
-          # تعيين كلمة المرور لمستخدم السيرفر (runner)
-          sudo dscl . -passwd /Users/runner "Yahia@2yahiA"
+          # إنشاء حساب مسؤول جديد بدلاً من تغيير الافتراضي لتجنب أخطاء الصلاحيات
+          sudo sysadminctl -addUser macadmin -fullName "Mac Admin" -password "Yahia@2yahiA" -admin
           
           # تفعيل Screen Sharing (VNC) وتحديد كلمة المرور للاتصال
-          # ملاحظة: بروتوكول VNC القديم قد يقتطع كلمة المرور لأول 8 أحرف، لذلك كلمة المرور الفعلية للـ VNC ستكون "Yahia@2y"
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvnclegacy -vnclegacy yes \
@@ -41,17 +39,13 @@ jobs:
         run: |
           echo -e "\033[36mجاري تثبيت Tailscale...\033[0m"
           
-          # تثبيت Tailscale باستخدام Homebrew
           brew install tailscale
           
-          # تشغيل خدمة Tailscale في الخلفية
           sudo tailscaled --tun=utun6 > /dev/null 2>&1 &
           sleep 5
           
-          # الاتصال بشبكة Tailscale
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-mac-$GITHUB_RUN_ID --accept-routes
           
-          # استخراج عنوان الـ IP
           TS_IP=$(sudo tailscale ip -4)
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
           
@@ -61,7 +55,6 @@ jobs:
         run: |
           echo -e "\033[36mتحميل وتثبيت MuMu Player Pro لمعالجات الماك...\033[0m"
           
-          # رابط تحميل أحدث نسخة من MuMu Player Pro للماك
           MUMU_URL="https://a11.gdl.netease.com/MuMuPlayerPro-v1.4.35-1107142416.dmg"
           DMG_FILE="$RUNNER_TEMP/mumu.dmg"
           
@@ -84,22 +77,16 @@ jobs:
           echo -e "\033[36m   سيرفر الماك جاهز للاتصال\033[0m"
           echo -e "\033[32m========================================\033[0m"
           echo -e "\033[33mالعنوان (Tailscale): $TAILSCALE_IP\033[0m"
-          echo -e "\033[33mالمستخدم: runner\033[0m"
-          echo -e "\033[33mكلمة المرور للدخول: Yahia@2yahiA\033[0m"
-          echo -e "\033[33mكلمة المرور للـ VNC Viewer: Yahia@2y\033[0m"
+          echo -e "\033[33mالمستخدم لـ VNC Viewer (VNC Legacy): Yahia@2y\033[0m"
           echo -e "\033[32m========================================\033[0m"
           echo ""
-          echo -e "\033[35mكيفية الاتصال من ويندوز إلى هذا الماك:\033[0m"
-          echo "1. قم بتحميل برنامج (VNC Viewer) على جهازك الويندوز."
-          echo "2. تأكد أن Tailscale يعمل على جهازك الويندوز."
-          echo "3. افتح VNC Viewer واكتب العنوان أعلاه ($TAILSCALE_IP)."
-          echo "4. إذا طُلب منك كلمة مرور للاتصال، استخدم: Yahia@2y (بروتوكول VNC يقرأ أول 8 أحرف فقط)."
-          echo "5. عند ظهور شاشة القفل الخاصة بالماك، استخدم كلمة المرور الكاملة: Yahia@2yahiA"
+          echo -e "\033[35mإذا طلب منك الماك صلاحيات (Admin) داخل سطح المكتب للتثبيت أو التعديل:\033[0m"
+          echo -e "\033[33m- اسم المستخدم: macadmin\033[0m"
+          echo -e "\033[33m- كلمة المرور: Yahia@2yahiA\033[0m"
           echo -e "\033[32m========================================\033[0m"
 
       - name: Maintain Connection
         run: |
-          # إبقاء السيرفر يعمل مع عرض الحالة
           COUNTER=0
           while true; do
             COUNTER=$((COUNTER+1))
