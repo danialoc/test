@@ -39,8 +39,8 @@ jobs:
         run: |
           echo "Starting Tailscale connection..."
           
-          # تفعيل الاتصال باستخدام المفتاح السري
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-mac-$env:GITHUB_RUN_ID --accept-routes
+          # تفعيل الاتصال باستخدام صيغة github الصحيحة لتجنب مشكلة الرموز
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-mac-${{ github.run_id }} --accept-routes
           
           # الانتظار للحصول على IP
           tsIP=""
