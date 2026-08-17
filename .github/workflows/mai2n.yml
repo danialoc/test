@@ -12,21 +12,19 @@ jobs:
       - name: Enable High Performance & Prevent Sleep
         run: |
           echo -e "\033[36mتفعيل وضع الأداء العالي ومنع السكون...\033[0m"
-          
           sudo pmset -a sleep 0
           sudo pmset -a displaysleep 0
           sudo pmset -a disablesleep 1
-          
           echo -e "\033[32mتم تفعيل وضع الأداء العالي بنجاح!\033[0m"
 
-      - name: Configure Screen Sharing (VNC for Windows)
+      - name: Configure Screen Sharing (VNC)
         run: |
           echo -e "\033[36mإعداد خدمة الاتصال عن بُعد (VNC)...\033[0m"
           
-          # إنشاء حساب مسؤول جديد بدلاً من تغيير الافتراضي لتجنب أخطاء الصلاحيات
+          # إنشاء حساب مسؤول جديد
           sudo sysadminctl -addUser macadmin -fullName "Mac Admin" -password "Yahia@2yahiA" -admin
           
-          # تفعيل Screen Sharing (VNC) وتحديد كلمة المرور للاتصال
+          # تفعيل Screen Sharing (VNC)
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvnclegacy -vnclegacy yes \
@@ -40,7 +38,6 @@ jobs:
           echo -e "\033[36mجاري تثبيت Tailscale...\033[0m"
           
           brew install tailscale
-          
           sudo tailscaled --tun=utun6 > /dev/null 2>&1 &
           sleep 5
           
@@ -51,38 +48,15 @@ jobs:
           
           echo -e "\033[32mتم تثبيت Tailscale والحصول على IP: $TS_IP\033[0m"
 
-      - name: Install MuMu Player Pro (macOS Version)
-        run: |
-          echo -e "\033[36mتحميل وتثبيت MuMu Player Pro لمعالجات الماك...\033[0m"
-          
-          MUMU_URL="https://a11.gdl.netease.com/MuMuPlayerPro-v1.4.35-1107142416.dmg"
-          DMG_FILE="$RUNNER_TEMP/mumu.dmg"
-          
-          curl -L -o "$DMG_FILE" "$MUMU_URL" --silent || true
-          
-          if [ -f "$DMG_FILE" ]; then
-            echo "جاري تثبيت المحاكي في التطبيقات..."
-            hdiutil attach "$DMG_FILE" -nobrowse -mountpoint /Volumes/mumu_mount
-            sudo cp -R /Volumes/mumu_mount/*.app /Applications/ || true
-            hdiutil detach /Volumes/mumu_mount || true
-            echo -e "\033[32mتم تثبيت MuMu Player Pro بنجاح!\033[0m"
-          else
-            echo -e "\033[33mتعذر التثبيت التلقائي للمحاكي، يمكنك تثبيته يدوياً بعد الاتصال.\033[0m"
-          fi
-
       - name: Display Connection Info
         run: |
           echo ""
           echo -e "\033[32m========================================\033[0m"
           echo -e "\033[36m   سيرفر الماك جاهز للاتصال\033[0m"
           echo -e "\033[32m========================================\033[0m"
-          echo -e "\033[33mالعنوان (Tailscale): $TAILSCALE_IP\033[0m"
-          echo -e "\033[33mالمستخدم لـ VNC Viewer (VNC Legacy): Yahia@2y\033[0m"
-          echo -e "\033[32m========================================\033[0m"
-          echo ""
-          echo -e "\033[35mإذا طلب منك الماك صلاحيات (Admin) داخل سطح المكتب للتثبيت أو التعديل:\033[0m"
-          echo -e "\033[33m- اسم المستخدم: macadmin\033[0m"
-          echo -e "\033[33m- كلمة المرور: Yahia@2yahiA\033[0m"
+          echo -e "\033[33mالعنوان (Tailscale IP): $TAILSCALE_IP\033[0m"
+          echo -e "\033[33mكلمة المرور للـ VNC Viewer: Yahia@2y\033[0m"
+          echo -e "\033[33mحساب الأدمن للماك (macadmin): Yahia@2yahiA\033[0m"
           echo -e "\033[32m========================================\033[0m"
 
       - name: Maintain Connection
