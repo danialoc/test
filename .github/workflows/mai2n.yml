@@ -24,12 +24,14 @@ jobs:
           # إنشاء حساب مسؤول جديد
           sudo sysadminctl -addUser macadmin -fullName "Mac Admin" -password "Yahia@2yahiA" -admin
           
-          # تفعيل Screen Sharing (VNC)
+          # تفعيل Screen Sharing (VNC) ومنح الصلاحيات اللازمة للاتصال
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
+            -allowAccessFor -allUsers \
+            -privs -all \
             -clientopts -setvnclegacy -vnclegacy yes \
-            -clientopts -setvncpw -vncpw "Yahia@2yahiA" \
-            -restart -agent -privs -all
+            -clientopts -setvncpw -vncpw "Yahia@2y" \
+            -restart -agent
 
           echo -e "\033[32mتم إعداد خدمة VNC بنجاح!\033[0m"
 
