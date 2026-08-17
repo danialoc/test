@@ -5,8 +5,7 @@ on:
 
 jobs:
   secure-vnc-mac:
-    # تم التغيير إلى macos-13 لتجنب مشكلة الشاشة السوداء والحماية الأمنية في الإصدارات الأحدث
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 3600
 
     steps:
@@ -18,14 +17,27 @@ jobs:
           sudo pmset -a disablesleep 1
           echo -e "\033[32mتم تفعيل وضع الأداء العالي بنجاح!\033[0m"
 
+      - name: Bypass macOS Screen Recording Protection (TCC Injection)
+        run: |
+          echo -e "\033[36mجاري كسر حماية الشاشة (TCC Database)...\033[0m"
+          
+          # إيقاف خدمة TCC مؤقتاً لتجنب قفل قاعدة البيانات
+          sudo killall tccd || true
+          
+          # حقن صلاحيات تصوير الشاشة (ScreenCapture) لخدمة الـ VNC الخاصة بآبل داخل قاعدة البيانات
+          sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, flags) VALUES ('kTCCServiceScreenCapture', 'com.apple.screensharing.agent', 0, 2, 4, 1, 0);"
+          sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, flags) VALUES ('kTCCServiceScreenCapture', 'com.apple.RemoteDesktop.agent', 0, 2, 4, 1, 0);"
+          
+          echo -e "\033[32mتم حقن صلاحيات الشاشة بنجاح!\033[0m"
+
       - name: Configure Screen Sharing (VNC)
         run: |
           echo -e "\033[36mإعداد خدمة الاتصال عن بُعد (VNC)...\033[0m"
           
-          # فرض إعادة تعيين كلمة مرور الحساب الافتراضي دون الحاجة لكلمة المرور القديمة
+          # تعيين كلمة مرور جديدة للحساب الافتراضي للسيرفر (runner)
           sudo sysadminctl -resetPasswordFor "runner" -newPassword "Yahia@2yahiA"
           
-          # تفعيل Screen Sharing (VNC) للحساب الحالي (runner)
+          # تفعيل خدمة VNC
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -allowAccessFor -allUsers \
@@ -34,7 +46,7 @@ jobs:
             -clientopts -setvncpw -vncpw "Yahia@2y" \
             -restart -agent
             
-          # إرسال أمر لوحة مفاتيح وهمي لإيقاظ الشاشة لتجنب أي تعليق
+          # إرسال أمر لوحة مفاتيح وهمي لإنعاش واجهة النظام وتجنب الشاشة السوداء
           osascript -e 'tell application "System Events" to key code 123' || true
 
           echo -e "\033[32mتم إعداد خدمة VNC بنجاح!\033[0m"
@@ -61,7 +73,7 @@ jobs:
           echo -e "\033[36m   سيرفر الماك جاهز للاتصال\033[0m"
           echo -e "\033[32m========================================\033[0m"
           echo -e "\033[33mالعنوان (Tailscale IP): $TAILSCALE_IP\033[0m"
-          echo -e "\033[33mكلمة المرور للـ VNC Viewer (إن طُلبت): Yahia@2y\033[0m"
+          echo -e "\033[33mكلمة المرور للـ VNC Viewer: Yahia@2y\033[0m"
           echo -e "\033[33mحساب الماك (Username): runner\033[0m"
           echo -e "\033[33mكلمة مرور الماك (Password): Yahia@2yahiA\033[0m"
           echo -e "\033[32m========================================\033[0m"
