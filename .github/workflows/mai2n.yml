@@ -9,9 +9,9 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Create RDP User
+      - name: Create User & Configure VNC
         run: |
-          # إنشاء مستخدم جديد باسم RDP وتعيين كلمة المرور
+          # إنشاء مستخدم RDP
           sudo dscl . -create /Users/RDP
           sudo dscl . -create /Users/RDP UserShell /bin/zsh
           sudo dscl . -create /Users/RDP RealName "RDP User"
@@ -22,27 +22,24 @@ jobs:
           sudo createhomedir -c -u RDP
           sudo dscl . -append /Groups/admin GroupMembership RDP
 
-      - name: Enable Screen Sharing / Remote Desktop
-        run: |
-          # تفعيل مشاركة الشاشة (VNC / RDP على macOS)
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+          # تفعيل Apple Remote Desktop وخدمة VNC على المنفذ 5900
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -vncpasswd "Yahia@2yahiA" \
+            -restart -agent -privs -all
 
       - name: Install Tailscale
         run: |
           echo "Installing Tailscale via Homebrew..."
           brew install tailscale
-          
-          # تشغيل خدمة Tailscale
           sudo brew services start tailscale
 
       - name: Establish Tailscale Connection
         run: |
           echo "Starting Tailscale connection..."
-          
-          # تفعيل الاتصال باستخدام صيغة github الصحيحة لتجنب مشكلة الرموز
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-mac-${{ github.run_id }} --accept-routes
           
-          # الانتظار للحصول على IP
           tsIP=""
           retries=0
           maxRetries=20
@@ -66,31 +63,16 @@ jobs:
           echo "Tailscale IP obtained: $tsIP"
           echo "TAILSCALE_IP=$tsIP" >> $GITHUB_ENV
 
-      - name: Display System Info
-        run: |
-          echo "========================================"
-          echo "معلومات النظام"
-          echo "========================================"
-          echo "نظام التشغيل: $(sw_vers -productName) $(sw_vers -productVersion)"
-          echo "المعالج: $(sysctl -n machdep.cpu.brand_string 2>/dev/null || uname -m)"
-          echo "عدد الأنوية: $(sysctl -n hw.ncpu)"
-          echo "الذاكرة: $(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 )) GB"
-          echo "========================================"
-
       - name: Display Connection Info
         run: |
           echo ""
           echo "========================================"
           echo "    VNC / Screen Sharing جاهز للاتصال"
           echo "========================================"
-          echo "العنوان: $TAILSCALE_IP"
-          echo "المستخدم: RDP"
-          echo "كلمة المرور: Yahia@2yahiA"
+          echo "العنوان (IP): $TAILSCALE_IP"
+          echo "المنفذ (Port): 5900"
+          echo "كلمة مرور VNC: Yahia@2yahiA"
           echo "========================================"
-          echo "ملاحظة: يمكنك الاتصال باستخدام أي عميل VNC"
-          echo "أو تطبيق Screen Sharing على جهاز Mac آخر عبر vnc://$TAILSCALE_IP"
-          echo "========================================"
-          echo ""
 
       - name: Maintain Connection
         run: |
