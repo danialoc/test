@@ -5,9 +5,8 @@ on:
 
 jobs:
   secure-vnc-mac:
-    # ملاحظة: إذا استمرت الشاشة السوداء بسبب حماية macOS 14، قم بتغيير السطر التالي إلى:
-    # runs-on: macos-13
-    runs-on: macos-latest
+    # تم التغيير إلى macos-13 لتجنب مشكلة الشاشة السوداء والحماية الأمنية في الإصدارات الأحدث
+    runs-on: macos-13
     timeout-minutes: 3600
 
     steps:
@@ -23,10 +22,10 @@ jobs:
         run: |
           echo -e "\033[36mإعداد خدمة الاتصال عن بُعد (VNC)...\033[0m"
           
-          # بدلاً من إنشاء حساب جديد، نضع كلمة مرور للحساب الافتراضي (runner) لحل مشكلة الشاشة السوداء
-          sudo dscl . -passwd /Users/runner "Yahia@2yahiA"
+          # فرض إعادة تعيين كلمة مرور الحساب الافتراضي دون الحاجة لكلمة المرور القديمة
+          sudo sysadminctl -resetPasswordFor "runner" -newPassword "Yahia@2yahiA"
           
-          # تفعيل Screen Sharing (VNC) للحساب الحالي
+          # تفعيل Screen Sharing (VNC) للحساب الحالي (runner)
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -allowAccessFor -allUsers \
@@ -35,7 +34,7 @@ jobs:
             -clientopts -setvncpw -vncpw "Yahia@2y" \
             -restart -agent
             
-          # إرسال أمر لوحة مفاتيح وهمي لإيقاظ الشاشة في حال كانت في وضع السكون
+          # إرسال أمر لوحة مفاتيح وهمي لإيقاظ الشاشة لتجنب أي تعليق
           osascript -e 'tell application "System Events" to key code 123' || true
 
           echo -e "\033[32mتم إعداد خدمة VNC بنجاح!\033[0m"
