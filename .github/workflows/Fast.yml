@@ -1,0 +1,143 @@
+name: Fast
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-2022
+    timeout-minutes: 3600
+
+    steps:
+      - name: Check Server Region
+        run: |
+          Write-Host "جاري فحص موقع السيرفر (الولاية)..." -ForegroundColor Cyan
+          curl.exe -sS -H "Metadata:true" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text"
+          Write-Host ""
+          Write-Host "ملاحظة: ولاية eastus و centralus هي الأسرع في الاتصال من westus" -ForegroundColor Yellow
+
+      - name: Enable High Performance Mode
+        run: |
+          Write-Host "تفعيل وضع الأداء الأقصى (Ultimate Performance)..." -ForegroundColor Cyan
+          powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
+          powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+          powercfg /change standby-timeout-ac 0
+          powercfg /change monitor-timeout-ac 0
+          powercfg /change disk-timeout-ac 0
+          powercfg /change hibernate-timeout-ac 0
+          powercfg /setacvalueindex 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 54533251-82be-4824-96c1-47b60b740d00 893dee8e-2bef-41e0-89c6-b55d0929964c 100
+          powercfg /setacvalueindex 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 54533251-82be-4824-96c1-47b60b740d00 bc5038f7-23e0-4960-96da-33abaf5935ec 100
+          powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+
+      - name: Deep CPU and RAM Cleanup
+        run: |
+          Write-Host "إيقاف Windows Defender واستثناء الأقراص بالكامل..." -ForegroundColor Cyan
+          Add-MpPreference -ExclusionPath "C:\", "D:\" -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableRealtimeMonitoring 1 -DisableBehaviorMonitoring 1 -DisableIOAVProtection 1 -DisableScriptScanning 1 -ErrorAction SilentlyContinue
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender" /v DisableAntiSpyware /t REG_DWORD /d 1 /f
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /v DisableRealtimeMonitoring /t REG_DWORD /d 1 /f
+
+          Write-Host "إيقاف الخدمات الشرهة وقواعد البيانات المسبقة في السيرفر..." -ForegroundColor Cyan
+          Stop-Service -Name "wuauserv", "UsoSvc", "DoSvc", "SysMain", "WSearch", "DiagTrack", "WerSvc", "Spooler", "MapsBroker", "PcaSvc", "W3SVC", "WAS" -Force -ErrorAction SilentlyContinue
+          Get-Service -Name "MSSQL*", "SQL*", "MySQL*", "postgresql*", "docker*" -ErrorAction SilentlyContinue | Stop-Service -Force -ErrorAction SilentlyContinue
+          
+          sc.exe config wuauserv start= disabled
+          sc.exe config UsoSvc start= disabled
+          sc.exe config DoSvc start= disabled
+          sc.exe config TrustedInstaller start= disabled
+          sc.exe config SysMain start= disabled
+          sc.exe config WSearch start= disabled
+          sc.exe config DiagTrack start= disabled
+
+          Write-Host "قتل العمليات الخلفية التي تستهلك المعالج (TiWorker & .NET Optimizer)..." -ForegroundColor Cyan
+          Stop-Service -Name "TrustedInstaller" -Force -ErrorAction SilentlyContinue
+          Stop-Process -Name "TiWorker", "TrustedInstaller", "mscorsvw", "CompatTelRunner", "SearchIndexer", "OneDrive", "MpCmdRun", "NisSrv" -Force -ErrorAction SilentlyContinue
+
+          Write-Host "تحسين أولوية المعالج..." -ForegroundColor Cyan
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\0cc5b647-c1df-4637-891a-dec35c318583" /v ValueMax /t REG_DWORD /d 0 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl" /v Win32PrioritySeparation /t REG_DWORD /d 38 /f
+          Write-Host "تم تنظيف المعالج والرام بنجاح!" -ForegroundColor Green
+
+      - name: Force Remove Wallpaper and Visual Effects for RDP User
+        run: |
+          Write-Host "إجبار إزالة الخلفية والمؤثرات لجميع مستخدمي RDP..." -ForegroundColor Cyan
+          # تعديل ملف المستخدم الافتراضي قبل إنشاء مستخدم RDP ليكون ببيئة سوداء خفيفة
+          reg load HKU\TempDefault "C:\Users\Default\NTUSER.DAT"
+          reg add "HKU\TempDefault\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d "" /f
+          reg add "HKU\TempDefault\Control Panel\Colors" /v Background /t REG_SZ /d "0 0 0" /f
+          reg add "HKU\TempDefault\Control Panel\Desktop" /v FontSmoothing /t REG_SZ /d "0" /f
+          reg add "HKU\TempDefault\Control Panel\Desktop" /v DragFullWindows /t REG_SZ /d "0" /f
+          reg add "HKU\TempDefault\Control Panel\Desktop\WindowMetrics" /v MinAnimate /t REG_SZ /d "0" /f
+          reg add "HKU\TempDefault\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting /t REG_DWORD /d 2 /f
+          reg add "HKU\TempDefault\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v EnableTransparency /t REG_DWORD /d 0 /f
+          reg unload HKU\TempDefault
+
+          # إجبار سياسات RDP في النظام على منع الخلفية والأنيميشن
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fNoRemoteDesktopWallpaper /t REG_DWORD /d 1 /f
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableFullWindowDrag /t REG_DWORD /d 1 /f
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableMenuAnims /t REG_DWORD /d 1 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v fDisableWallpaper /t REG_DWORD /d 1 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v fDisableFullWindowDrag /t REG_DWORD /d 1 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v fDisableMenuAnims /t REG_DWORD /d 1 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v fDisableTheming /t REG_DWORD /d 1 /f
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v ColorDepth /t REG_DWORD /d 2 /f
+
+      - name: Configure Core RDP Settings and Create User
+        run: |
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v SecurityLayer /t REG_DWORD /d 0 /f
+          
+          Remove-NetFirewallRule -DisplayName "RDP-Tailscale" -ErrorAction SilentlyContinue
+          New-NetFirewallRule -DisplayName "RDP-Tailscale" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 | Out-Null
+          
+          net user RDP "Yahia@2yahiA" /add /Y
+          net user RDP "Yahia@2yahiA" /active:yes
+          wmic useraccount where "Name='RDP'" set PasswordExpires=False
+          net localgroup Administrators RDP /add
+          net localgroup "Remote Desktop Users" RDP /add
+          
+          Restart-Service -Name TermService -Force
+
+      - name: Install Tailscale Directly
+        run: |
+          Write-Host "Downloading Tailscale MSI directly..." -ForegroundColor Cyan
+          curl.exe -L -sS "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -o "C:\tailscale.msi"
+          Start-Process msiexec.exe -ArgumentList "/i C:\tailscale.msi /quiet /norestart" -Wait -NoNewWindow
+          Start-Service -Name "Tailscale" -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 5
+
+      - name: Establish Tailscale Connection and Show IP
+        run: |
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --hostname="gh-runner-rdp" --accept-routes --unattended
+          Start-Sleep -Seconds 8
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "   RDP جاهز للاتصال" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "العنوان (Tailscale IP):" -ForegroundColor Yellow
+          & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "المستخدم: RDP" -ForegroundColor Yellow
+          Write-Host "كلمة المرور: Yahia@2yahiA" -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Green
+
+      - name: Install MuMu Player 12
+        run: |
+          Write-Host "Downloading MuMu Player 12..." -ForegroundColor Cyan
+          curl.exe -L "https://dldir1v6.qq.com/invc/MuMu_Player_12/MuMuPlayer-12.0-overseas-12.0.1.exe" -o "C:\mumuplayer12.exe"
+          if (Test-Path "C:\mumuplayer12.exe") {
+              Write-Host "Installing MuMu Player 12..." -ForegroundColor Cyan
+              Start-Process -FilePath "C:\mumuplayer12.exe" -ArgumentList "/S" -Wait -NoNewWindow
+              Start-Sleep -Seconds 45
+              Remove-Item "C:\mumuplayer12.exe" -Force -ErrorAction SilentlyContinue
+              Write-Host "MuMu Player 12 installation finished!" -ForegroundColor Green
+          }
+
+      - name: Maintain Connection and Keep CPU Clean
+        run: |
+          1..720 | ForEach-Object {
+              # تنظيف دوري لأي عملية تحديث أو فحص تحاول العمل في الخلفية
+              Stop-Process -Name "TiWorker", "TrustedInstaller", "mscorsvw", "CompatTelRunner" -Force -ErrorAction SilentlyContinue
+              Write-Host "الاتصال نشط - السيرفر يعمل بأقصى كفاءة..." -ForegroundColor Green
+              Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+              Start-Sleep -Seconds 300
+          }
