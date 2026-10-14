@@ -61,7 +61,6 @@ jobs:
       - name: Force Remove Wallpaper and Visual Effects for RDP User
         run: |
           Write-Host "إجبار إزالة الخلفية والمؤثرات لجميع مستخدمي RDP..." -ForegroundColor Cyan
-          # تعديل ملف المستخدم الافتراضي قبل إنشاء مستخدم RDP ليكون ببيئة سوداء خفيفة
           reg load HKU\TempDefault "C:\Users\Default\NTUSER.DAT"
           reg add "HKU\TempDefault\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d "" /f
           reg add "HKU\TempDefault\Control Panel\Colors" /v Background /t REG_SZ /d "0 0 0" /f
@@ -72,7 +71,6 @@ jobs:
           reg add "HKU\TempDefault\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v EnableTransparency /t REG_DWORD /d 0 /f
           reg unload HKU\TempDefault
 
-          # إجبار سياسات RDP في النظام على منع الخلفية والأنيميشن
           reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fNoRemoteDesktopWallpaper /t REG_DWORD /d 1 /f
           reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableFullWindowDrag /t REG_DWORD /d 1 /f
           reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fDisableMenuAnims /t REG_DWORD /d 1 /f
@@ -120,22 +118,9 @@ jobs:
           Write-Host "كلمة المرور: Yahia@2yahiA" -ForegroundColor Yellow
           Write-Host "========================================" -ForegroundColor Green
 
-      - name: Install MuMu Player 12
-        run: |
-          Write-Host "Downloading MuMu Player 12..." -ForegroundColor Cyan
-          curl.exe -L "https://dldir1v6.qq.com/invc/MuMu_Player_12/MuMuPlayer-12.0-overseas-12.0.1.exe" -o "C:\mumuplayer12.exe"
-          if (Test-Path "C:\mumuplayer12.exe") {
-              Write-Host "Installing MuMu Player 12..." -ForegroundColor Cyan
-              Start-Process -FilePath "C:\mumuplayer12.exe" -ArgumentList "/S" -Wait -NoNewWindow
-              Start-Sleep -Seconds 45
-              Remove-Item "C:\mumuplayer12.exe" -Force -ErrorAction SilentlyContinue
-              Write-Host "MuMu Player 12 installation finished!" -ForegroundColor Green
-          }
-
       - name: Maintain Connection and Keep CPU Clean
         run: |
           1..720 | ForEach-Object {
-              # تنظيف دوري لأي عملية تحديث أو فحص تحاول العمل في الخلفية
               Stop-Process -Name "TiWorker", "TrustedInstaller", "mscorsvw", "CompatTelRunner" -Force -ErrorAction SilentlyContinue
               Write-Host "الاتصال نشط - السيرفر يعمل بأقصى كفاءة..." -ForegroundColor Green
               Get-Date -Format "yyyy-MM-dd HH:mm:ss"
